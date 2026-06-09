@@ -8,7 +8,7 @@ import string
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # --- ⚠️ إعدادات البوت الأساسية ---
-BOT_TOKEN = "8891688659:AAE-4iL2yjSRQtPcmCnHjduMk9C8liuVFkk"      # توكن البوت الخاص بك من BotFather
+BOT_TOKEN = "8891688659:AAGeYh2cf1pLwRybse5R9lI39nnQOEPPxsI"      # توكن البوت الخاص بك من BotFather
 ADMIN_ID = 8672817508                # الـ ID بتاعك كمدير للبوت 👑
 
 # 🔑 بيانات الحسابات لموقع Durian 
@@ -18,7 +18,7 @@ DURIAN_ACCOUNTS = [
 ]
 # -----------------------------------------------------------------
 
-bot = telebot.TeleBot(BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN, num_threads=4) # تفعيل تعدد الخيوط للبوت لمنع التهنيج
 
 BALANCES_FILE = "balances.txt"
 SETTINGS_FILE = "settings.txt"
@@ -301,25 +301,29 @@ def send_welcome(message):
         welcome_text = f"• <u><b>🕸️ 𝕊ℙ𝓘𝓓𝓔𝓡 𝕊𝕄𝕊 🕷️ - Auto Hunting Bot</b></u> •\n\n💰 <b>رصيدك الحالي:</b> {get_user_balance(user_id):.2f} $\n\n🆔 الـ ID الخاص بك: <code>{user_id}</code>"
         bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_keyboard(), parse_mode="HTML")
 
+# ⚡ معالجة الأزرار بحماية تامة ضد الـ Response Timeout ⚡
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
     user_id = call.from_user.id
     if user_id in BANNED_USERS and user_id != ADMIN_ID: return
 
+    # تأمين فوري: الرد على التليجرام فوراً لمنع تعليق الزرار وإغلاق الـ Query
+    try: bot.answer_callback_query(call.id)
+    except: pass
+
     if call.data == "check_join_btn":
         if check_user_joined_channel(user_id):
-            bot.answer_callback_query(call.id, "✅ تم تفعيل حسابك بنجاح!", show_alert=True)
             welcome_text = f"• <u><b>🕸️ 𝕊ℙ𝓘𝓓𝓔𝓡 𝕊𝕄𝕊 🕷️ - Auto Hunting Bot</b></u> •\n\n💰 <b>رصيدك الحالي:</b> {get_user_balance(user_id):.2f} $\n\n🆔 الـ ID الخاص بك: <code>{user_id}</code>"
             bot.edit_message_text(chat_id=user_id, message_id=call.message.id, text=welcome_text, reply_markup=get_main_keyboard(), parse_mode="HTML")
         else:
-            bot.answer_callback_query(call.id, "❌ لسه مشركتش يا غالي! اشترك الحين.", show_alert=True)
+            try: bot.send_message(user_id, "❌ لسه مشركتش يا غالي! اشترك الحين.")
+            except: pass
         return
 
     if not check_user_joined_channel(user_id) and user_id != ADMIN_ID: return
 
     if user_id == ADMIN_ID:
         if call.data == "admin_back_main":
-            bot.answer_callback_query(call.id)
             admin_text = (
                 f"👑 <b>مرحباً بك يا مدير في لوحة التحكم الإدارية الفائقة</b>\n\n"
                 f"📊 <b>إحصائيات حية:</b>\n"
@@ -332,14 +336,12 @@ def handle_callbacks(call):
         elif call.data == "admin_clear_cache":
             global active_hunted_numbers
             active_hunted_numbers.clear()
-            bot.answer_callback_query(call.id, "🔄 تم تنظيف الذاكرة!", show_alert=True)
+            bot.send_message(user_id, "🔄 تم تنظيف الذاكرة التخزينية بنجاح!")
             return
         elif call.data == "admin_set_vars":
-            bot.answer_callback_query(call.id)
             bot.edit_message_text(chat_id=user_id, message_id=call.message.id, text="⚙️ **إعدادات ومغيرات السيستم من التليجرام:**", reply_markup=get_admin_vars_keyboard(), parse_mode="Markdown")
             return
         elif call.data in ["edit_wallet", "edit_rate", "edit_binance", "edit_pid", "edit_chuser", "edit_churl", "edit_refreward", "edit_support"]:
-            bot.answer_callback_query(call.id)
             admin_state[user_id] = {"mode": "edit_var", "var": call.data.replace("edit_", "")}
             bot.send_message(user_id, "✍️ أرسل القيمة الجديدة الآن:")
             return
@@ -352,34 +354,30 @@ def handle_callbacks(call):
             bot.register_next_step_handler(msg, process_admin_target_id, "sub")
             return
         elif call.data == "admin_gen_promo":
-            bot.answer_callback_query(call.id)
             admin_state[user_id] = {"mode": "gen_promo"}
             bot.send_message(user_id, "✍️ أدخل قيمة كود الشحن بالدولار:")
             return
         elif call.data == "admin_mass_price":
-            bot.answer_callback_query(call.id)
             admin_state[user_id] = {"mode": "mass_price"}
             bot.send_message(user_id, "✍️ أدخل السعر الموحد الجديد لجميع الدول:")
             return
         elif call.data == "admin_manage_user":
-            bot.answer_callback_query(call.id)
             admin_state[user_id] = {"mode": "query_user"}
             bot.send_message(user_id, "✍️ أرسل الـ ID الخاص بالزبون:")
             return
         elif call.data.startswith("banuser_"):
             t_id = int(call.data.split("_")[1])
-            if t_id in BANNED_USERS: BANNED_USERS.remove(t_id); bot.answer_callback_query(call.id, "🟢 تم فك الحظر")
-            else: BANNED_USERS.add(t_id); bot.answer_callback_query(call.id, "🔴 تم حظر الزبون")
+            if t_id in BANNED_USERS: BANNED_USERS.remove(t_id); bot.send_message(user_id, "🟢 تم فك الحظر")
+            else: BANNED_USERS.add(t_id); bot.send_message(user_id, "🔴 تم حظر الزبون")
             save_data("banned")
             return
         elif call.data.startswith("clearbal_"):
             t_id = int(call.data.split("_")[1])
             USER_BALANCES[t_id] = 0.00
             save_data("balances")
-            bot.answer_callback_query(call.id, "🔄 تم تصفير المحفظة", show_alert=True)
+            bot.send_message(user_id, "🔄 تم تصفير المحفظة بنجاح")
             return
         elif call.data == "admin_set_country_price":
-            bot.answer_callback_query(call.id)
             admin_state[user_id] = {"mode": "set_country_select"}
             bot.send_message(user_id, "✍️ اكتب اسم الدولة بالظبط:")
             return
@@ -388,7 +386,6 @@ def handle_callbacks(call):
             bot.register_next_step_handler(msg, process_admin_broadcast)
             return
         elif call.data == "admin_refresh_stats":
-            bot.answer_callback_query(call.id)
             admin_text = (
                 f"👑 <b>لوحة التحكم المحدثة الفائقة</b>\n\n"
                 f"📊 <b>إحصائيات حية:</b>\n"
@@ -399,11 +396,9 @@ def handle_callbacks(call):
             return
 
     if call.data == "manage_hunting":
-        bot.answer_callback_query(call.id)
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, text="🌍 **قسم الصيد التلقائي لأرقام التليجرام:**", reply_markup=get_countries_keyboard(user_id, page=0), parse_mode="Markdown")
         return
     elif call.data.startswith("hpage_"):
-        bot.answer_callback_query(call.id)
         bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.id, reply_markup=get_countries_keyboard(user_id, page=int(call.data.split("_")[1])))
         return
     elif call.data.startswith("hunt_"):
@@ -413,19 +408,16 @@ def handle_callbacks(call):
         name, price, _ = get_country_info_by_code(code)
         
         if code not in user_hunting_targets[user_id] and get_user_balance(user_id) <= 0:
-            bot.answer_callback_query(call.id, "❌ محفظتك فارغة!", show_alert=True)
+            bot.send_message(user_id, "❌ محفظتك فارغة! يرجى الشحن أولاً.")
             return
         if code in user_hunting_targets[user_id]:
             user_hunting_targets[user_id].remove(code)
-            bot.answer_callback_query(call.id, f"🛑 تم إيقاف صيد {name}")
         else:
             user_hunting_targets[user_id].append(code)
-            bot.answer_callback_query(call.id, f"🎯 تم تفعيل صيد {name}")
         bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.id, reply_markup=get_countries_keyboard(user_id, page=page))
         return
 
     elif call.data == "user_referral":
-        bot.answer_callback_query(call.id)
         bot_info = bot.get_me()
         ref_link = f"https://t.me/{bot_info.username}?start={user_id}"
         ref_text = f"👥 <b>برنامج إحالة وربح رصيد مجاني</b>\n\n🔗 <code>{ref_link}</code>\n\n💰 ستحصل على <b>{SETTINGS['ref_reward']:.2f}$</b> لكل صديق جديد يشترك!"
@@ -435,34 +427,29 @@ def handle_callbacks(call):
         return
 
     elif call.data == "deposit":
-        bot.answer_callback_query(call.id)
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, text="💳 **الرجاء اختيار طريقة الإيداع المناسبة لك للشحن:**", reply_markup=get_deposit_methods_keyboard(), parse_mode="Markdown")
         return
 
     elif call.data == "dep_vodafone":
-        bot.answer_callback_query(call.id)
         deposit_text = f"📱 <b>شحن الرصيد عبر فودافون كاش</b>\n\n📱 رقم الكاش: <code>{SETTINGS['wallet']}</code>\n💵 الحسبة: 1$ = {SETTINGS['rate']} جنيه."
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("🔙 عودة", callback_data="deposit"))
-        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, text=deposit_text, reply_markup=markup, parse_mode="HTML")
+        bot.edit_message_text(chat_id=user_id, message_id=call.message.id, text=deposit_text, reply_markup=markup, parse_mode="HTML")
         return
 
     elif call.data == "dep_binance":
-        bot.answer_callback_query(call.id)
         binance_text = f"🪙 <b>شحن الرصيد عبر Binance Pay</b>\n\n🆔 معرف بايننس: <code>{SETTINGS['binance_id']}</code>"
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("🔙 عودة", callback_data="deposit"))
-        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, text=binance_text, reply_markup=markup, parse_mode="HTML")
+        bot.edit_message_text(chat_id=user_id, message_id=call.message.id, text=binance_text, reply_markup=markup, parse_mode="HTML")
         return
 
     elif call.data == "user_redeem_promo":
-        bot.answer_callback_query(call.id)
         admin_state[user_id] = {"mode": "redeem_promo"}
         bot.send_message(user_id, "🎫 أدخل كود الهدية الخاص بك هنا:")
         return
 
     elif call.data == "user_orders":
-        bot.answer_callback_query(call.id)
         orders = USER_ORDERS.get(user_id, [])
         if not orders: bot.send_message(user_id, "📋 ليس لديك أرقام مشتراة.")
         else:
@@ -471,8 +458,7 @@ def handle_callbacks(call):
         return
 
     elif call.data == "back_to_main":
-        bot.answer_callback_query(call.id)
-        welcome_text = f"• <u><b>🕸️ 𝕊ℙ𝓘𝓓𝓔𝓡 𝕊𝕄𝕊 🕷️ - Auto Hunting Bot</b></u> •\n\n💰 <b>رصيدك الحالي:</b> {get_user_balance(user_id):.2f} $\n\n🆔 الـ ID الخاص بك: <code>{user_id}</code>"
+        welcome_text = f"• <u><b>🕸️ 𝕾𝕻𝕴𝕯𝕰𝕽 𝕾𝕸𝕾 🕷️ - Auto Hunting Bot</b></u> •\n\n💰 <b>رصيدك الحالي:</b> {get_user_balance(user_id):.2f} $\n\n🆔 الـ ID الخاص بك: <code>{user_id}</code>"
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, text=welcome_text, reply_markup=get_main_keyboard(), parse_mode="HTML")
         return
     
@@ -480,9 +466,8 @@ def handle_callbacks(call):
         current_time = time.time()
         last_purchase_time = USER_PURCHASE_COOLDOWN.get(user_id, 0)
         
-        # ⏱️ الحظر الفوري للإسبام: الزبون مجبر ينتظر 5 ثوانٍ بين محاولات حجز الأرقام
         if current_time - last_purchase_time < 5:
-            bot.answer_callback_query(call.id, "⚠️ يرجى الانتظار 5 ثوانٍ بين محاولات الشراء.", show_alert=True)
+            bot.send_message(user_id, "⚠️ يرجى الانتظار 5 ثوانٍ بين محاولات الشراء.")
             return
 
         parts = call.data.split("_")
@@ -493,12 +478,9 @@ def handle_callbacks(call):
             target_info = active_hunted_numbers[phone]
             price = float(target_info['price'])
             
-            # 💸 التعديل الأمني: نتحقق من رصيده أولاً، لكن لا نخصم شيئاً الحين!
             if get_user_balance(user_id) >= price:
                 USER_PURCHASE_COOLDOWN[user_id] = current_time
                 del active_hunted_numbers[phone]
-                
-                bot.answer_callback_query(call.id, "🔄 جاري التأمين وبدء الفحص...")
                 
                 loading_markup = InlineKeyboardMarkup()
                 loading_markup.add(InlineKeyboardButton("10%", callback_data="none"))
@@ -510,13 +492,14 @@ def handle_callbacks(call):
                     parse_mode="HTML"
                 )
                 
-                threading.Thread(target=wait_for_sms, args=(user_id, phone, price, acc_index, call.message.id, target_info['country'], target_info['flag'])).start()
+                # 🚀 تفجير خيط مستقل فوراً لمنع سقوط البوت أو تهنيجه نهائياً 🚀
+                threading.Thread(target=wait_for_sms, args=(user_id, phone, price, acc_index, call.message.id, target_info['country'], target_info['flag']), daemon=True).start()
             else:
-                bot.answer_callback_query(call.id, "❌ رصيدك غير كافٍ!", show_alert=True)
+                bot.send_message(user_id, "❌ رصيدك غير كافٍ للشراء!")
         else:
-            bot.answer_callback_query(call.id, "❌ الرقم تم بيعه أو انتهت صلاحيته!", show_alert=True)
+            bot.send_message(user_id, "❌ الرقم تم بيعه أو انتهت صلاحيته!")
 
-# --- ⚙️ معالجة الرسائل النصية المصلحة من أخطاء الـ Syntax بالملي الحين جوة السيستم ---
+# --- ⚙️ معالجة الرسائل النصية ---
 @bot.message_handler(func=lambda msg: msg.from_user.id in admin_state)
 def handle_states(message):
     user_id = message.from_user.id
@@ -666,7 +649,6 @@ def global_auto_buyer():
                 time.sleep(0.5)
             time.sleep(0.5)
 
-# ⏱️ ⚡ دالة الفحص الذكية المعدلة: الخصم التلقائي والفعلي للرصيد يحصل بعد وصول كود الـ SMS بنجاح فقط! الحين مقفلة 🔒📌
 def wait_for_sms(user_id, phone_number, price, acc_index, status_msg_id, c_name, flag):
     acc = DURIAN_ACCOUNTS[acc_index]
     sms_url = f"https://api.durianrcs.com/out/ext_api/getMsg?name={acc[0]}&ApiKey={acc[1]}&pn={phone_number}&pid={str(SETTINGS['pid'])}&serial=2"
@@ -704,7 +686,6 @@ def wait_for_sms(user_id, phone_number, price, acc_index, status_msg_id, c_name,
             if res.get("code") == 200:
                 sms_code = res.get("data")
                 
-                # 💸 لحظة استلام الكود بنجاح: الحين يحصل الخصم الحقيقي والأكيد من محفظة العميل! 🔒💰
                 if user_id not in USER_BALANCES: USER_BALANCES[user_id] = 0.00
                 USER_BALANCES[user_id] = max(0.00, USER_BALANCES[user_id] - price)
                 save_data("balances")
@@ -728,7 +709,6 @@ def wait_for_sms(user_id, phone_number, price, acc_index, status_msg_id, c_name,
                 return
         except: pass
     
-    # ❌ لو موصلش الكود وانتهى الوقت: الرصيد أصلاً مخصمنهوش من الأول، فبنلغي الرقم أوتوماتيك مجاناً تماماً! 😎🍿
     release_bad_number(phone_number, acc_index)
     SYSTEM_STATS["failed_orders"] += 1
     
@@ -779,11 +759,14 @@ def process_admin_broadcast(message):
     bot.send_message(ADMIN_ID, f"✅ تم الإرسال لـ {count} زبون بنجاح.")
 
 def run_bot_safe():
-    print("🕸️🕷️ تم قفل منطق الخصم الآمن والـ Cooldown المظبوط بنجاح... 🚀✨📌")
+    print("🕸️🕷️ تم تفعيل نظام تعدد الخيوط المدرع وحماية الـ Polling بنجاح... 🚀✨📌")
     threading.Thread(target=global_auto_buyer, daemon=True).start()
     while True:
-        try: bot.infinity_polling(timeout=20, long_polling_timeout=10)
-        except: time.sleep(5)
+        try: 
+            # رفع قيمة الـ timeout لحماية الاتصال من الانهيار والسقوط الدائم
+            bot.infinity_polling(timeout=80, long_polling_timeout=40)
+        except: 
+            time.sleep(3)
 
 if __name__ == "__main__":
     run_bot_safe()
